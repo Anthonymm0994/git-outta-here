@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Explorer - Core Tests</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #4a9eff;
+            margin-bottom: 10px;
+        }
+        
+        .test-results {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-output {
+            background: #000;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #4a9eff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+        }
+        
+        button:hover {
+            background: #357abd;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .status.running {
+            background: #feca57;
+            color: #000;
+        }
+        
+        .status.complete {
+            background: #4ecdc4;
+            color: #000;
+        }
+        
+        .status.error {
+            background: #ff6b6b;
+            color: #000;
+        }
+        
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .summary-item {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .summary-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4a9eff;
+        }
+        
+        .summary-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Data Explorer Core Tests</h1>
+        <p>Testing the modular architecture and core functionality</p>
+    </div>
+    
+    <div class="controls">
+        <button onclick="runTests()">Run All Tests</button>
+        <button onclick="clearResults()">Clear Results</button>
+        <button onclick="runPerformanceTest()">Performance Test</button>
+    </div>
+    
+    <div class="status" id="status">Ready to run tests</div>
+    
+    <div class="test-results">
+        <h3>Test Output</h3>
+        <div class="test-output" id="testOutput">Click "Run All Tests" to start testing...</div>
+    </div>
+    
+    <div class="summary" id="summary" style="display: none;">
+        <div class="summary-item">
+            <div class="summary-value" id="totalTests">0</div>
+            <div class="summary-label">Total Tests</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value" id="passedTests">0</div>
+            <div class="summary-label">Passed</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value" id="failedTests">0</div>
+            <div class="summary-label">Failed</div>
+        </div>
+        <div class="summary-item">
+            <div class="summary-value" id="successRate">0%</div>
+            <div class="summary-label">Success Rate</div>
+        </div>
+    </div>
+    
+    <script src="test_core.js"></script>
+    
+    <script>
+        let testResults = null;
+        
+        function runTests() {
+            const status = document.getElementById('status');
+            const output = document.getElementById('testOutput');
+            const summary = document.getElementById('summary');
+            
+            status.textContent = 'Running tests...';
+            status.className = 'status running';
+            output.textContent = '';
+            summary.style.display = 'none';
+            
+            // Capture console output
+            const originalLog = console.log;
+            const logMessages = [];
+            
+            console.log = function(...args) {
+                const message = args.map(arg => 
+                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                ).join(' ');
+                logMessages.push(message);
+                output.textContent = logMessages.join('\n');
+                output.scrollTop = output.scrollHeight;
+                originalLog.apply(console, args);
+            };
+            
+            // Run tests
+            setTimeout(() => {
+                try {
+                    // The tests should run automatically when the page loads
+                    // We'll just wait a moment and then check results
+                    setTimeout(() => {
+                        if (window.runner && window.runner.results) {
+                            testResults = window.runner.results;
+                            updateSummary();
+                            status.textContent = 'Tests completed successfully!';
+                            status.className = 'status complete';
+                        } else {
+                            status.textContent = 'Tests completed - check console for results';
+                            status.className = 'status complete';
+                        }
+                    }, 1000);
+                } catch (error) {
+                    status.textContent = `Test error: ${error.message}`;
+                    status.className = 'status error';
+                    console.error('Test execution error:', error);
+                }
+                
+                // Restore console
+                console.log = originalLog;
+            }, 100);
+        }
+        
+        function clearResults() {
+            document.getElementById('testOutput').textContent = 'Click "Run All Tests" to start testing...';
+            document.getElementById('status').textContent = 'Ready to run tests';
+            document.getElementById('status').className = 'status';
+            document.getElementById('summary').style.display = 'none';
+        }
+        
+        function updateSummary() {
+            if (!testResults) return;
+            
+            document.getElementById('totalTests').textContent = testResults.total;
+            document.getElementById('passedTests').textContent = testResults.passed;
+            document.getElementById('failedTests').textContent = testResults.failed;
+            document.getElementById('successRate').textContent = 
+                Math.round((testResults.passed / testResults.total) * 100) + '%';
+            
+            document.getElementById('summary').style.display = 'grid';
+        }
+        
+        function runPerformanceTest() {
+            const output = document.getElementById('testOutput');
+            const status = document.getElementById('status');
+            
+            status.textContent = 'Running performance test...';
+            status.className = 'status running';
+            
+            output.textContent = 'Performance Test Results:\n\n';
+            
+            // Test TypedArray performance
+            const testSizes = [100000, 1000000, 5000000];
+            
+            testSizes.forEach(size => {
+                const startTime = performance.now();
+                
+                // Create and populate TypedArray
+                const data = new Float32Array(size * 4);
+                for (let i = 0; i < data.length; i++) {
+                    data[i] = Math.random() * 1000;
+                }
+                
+                // Simulate data processing
+                let sum = 0;
+                for (let i = 0; i < data.length; i++) {
+                    sum += data[i];
+                }
+                
+                const endTime = performance.now();
+                const duration = endTime - startTime;
+                
+                output.textContent += `Size: ${size.toLocaleString()} rows (${(size * 4).toLocaleString()} values)\n`;
+                output.textContent += `Duration: ${duration.toFixed(2)}ms\n`;
+                output.textContent += `Rate: ${(size / (duration / 1000)).toLocaleString()} rows/sec\n\n`;
+            });
+            
+            status.textContent = 'Performance test completed!';
+            status.className = 'status complete';
+        }
+        
+        // Auto-run tests when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (window.runner) {
+                    runTests();
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>

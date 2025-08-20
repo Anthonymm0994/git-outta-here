@@ -38,3 +38,4 @@ This iteration adds zoom capabilities to the original data explorer, allowing us
 ## Files
 
 - `data_explorer_zoom.html` - Main application with zoom functionality
+
