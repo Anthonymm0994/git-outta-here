@@ -53,7 +53,7 @@ impl HtmlGenerator {
         // Generate column-specific chart HTML
         let mut chart_html = String::new();
         
-        for (i, column) in schema.columns.iter().enumerate() {
+        for (_i, column) in schema.columns.iter().enumerate() {
             // Create descriptive canvas ID based on column name (like original data_explorer.html)
             let canvas_id = format!("{}Canvas", column.name.replace(" ", "").replace("_", ""));
             let panel_class = match column.data_type {

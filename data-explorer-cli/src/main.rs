@@ -10,7 +10,7 @@ use data_explorer_cli::{
     ProcessingConfig,
 };
 use std::path::PathBuf;
-use tracing::{info, error, Level};
+use tracing::{info, Level};
 use tracing_subscriber;
 
 #[tokio::main]

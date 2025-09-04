@@ -1,7 +1,6 @@
 //! Type inference module
 
-use crate::data::{ProcessedData, Schema, ColumnInfo, DataType, ColumnStatistics};
-use crate::ProcessingConfig;
+use crate::data::{ProcessedData, Schema};
 
 #[derive(Debug, thiserror::Error)]
 pub enum InferenceError {

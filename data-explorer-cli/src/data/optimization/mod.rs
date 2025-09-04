@@ -1,7 +1,6 @@
 //! Parquet optimization module
 
 use crate::data::ProcessedData;
-use crate::ProcessingConfig;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum CompressionType {

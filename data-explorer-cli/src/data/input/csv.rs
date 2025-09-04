@@ -154,7 +154,7 @@ impl CsvReader {
     
     fn create_schema(&self, columns: &HashMap<String, ColumnData>, row_count: usize) -> Schema {
         let column_infos = columns.iter()
-            .map(|(name, data)| {
+            .map(|(name, _data)| {
                 ColumnInfo {
                     name: name.clone(),
                     data_type: DataType::String, // Will be updated during type inference

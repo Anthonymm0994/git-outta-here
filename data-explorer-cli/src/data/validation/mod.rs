@@ -1,7 +1,6 @@
 //! Data validation module
 
 use crate::data::{ProcessedData, Schema, DataType};
-use crate::ProcessingConfig;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ValidationRule {
@@ -37,7 +36,7 @@ impl DataValidator {
         }
     }
     
-    pub async fn validate_and_clean(&self, data: ProcessedData, schema: &Schema) -> Result<ProcessedData, ValidationError> {
+    pub async fn validate_and_clean(&self, data: ProcessedData, _schema: &Schema) -> Result<ProcessedData, ValidationError> {
         // Placeholder implementation
         // TODO: Implement actual validation logic
         Ok(data)

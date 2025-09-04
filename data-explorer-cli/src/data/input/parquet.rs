@@ -1,10 +1,8 @@
 //! Parquet file reading and parsing
 
 use super::FileReader;
-use crate::data::{ProcessedData, Schema, ColumnInfo, ColumnData, DataType, ColumnStatistics, DataMetadata};
+use crate::data::ProcessedData;
 use std::path::Path;
-use std::collections::HashMap;
-use chrono::Utc;
 
 #[derive(Debug, Clone)]
 pub struct ParquetConfig {
@@ -47,7 +45,7 @@ impl FileReader for ParquetReader {
         Self { config }
     }
     
-    async fn read_file(&self, path: &Path) -> Result<ProcessedData, Self::Error> {
+    async fn read_file(&self, _path: &Path) -> Result<ProcessedData, Self::Error> {
         // For now, return a placeholder implementation
         // This will be implemented with actual Parquet reading logic
         Err(ParquetError::ReadError("Parquet reading not yet implemented".to_string()))
