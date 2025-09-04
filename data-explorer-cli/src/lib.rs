@@ -2,13 +2,19 @@
 //! 
 //! This library provides the core functionality for processing CSV/Parquet files
 //! and generating self-contained HTML files with embedded data visualizations.
+//! 
+//! The library is organized into several key modules:
+//! - `cli`: Command-line interface and argument parsing
+//! - `data`: Data processing pipeline (input, inference, validation, optimization)
+//! - `html`: HTML generation with interactive charts and embedded data
+//! - `utils`: Utility functions and helper types
 
 pub mod cli;
 pub mod data;
 pub mod html;
 pub mod utils;
 
-// Re-export main types for convenience
+// Re-export main types for convenient access from the library
 pub use data::{
     ProcessedData, Schema, ColumnInfo, ColumnData, DataType, 
     ColumnStatistics, DataMetadata
@@ -17,46 +23,89 @@ pub use data::{
 pub use cli::{Cli, Commands, CommandHandler};
 pub use html::HtmlGenerator;
 
-/// Main processing result
+/// Main processing result that summarizes the data processing operation
+/// 
+/// This structure contains comprehensive information about the processing
+/// operation, including performance metrics, data quality assessment,
+/// and the resulting schema. It's used for reporting and debugging.
 #[derive(Debug, Clone)]
 pub struct ProcessingResult {
+    /// Number of rows in the input dataset
     pub input_rows: usize,
+    /// Size of the generated output (HTML file) in bytes
     pub output_size: usize,
+    /// Total time taken for the processing operation
     pub processing_time: std::time::Duration,
+    /// Schema information about the processed data
     pub schema: Schema,
+    /// Data quality metrics and validation results
     pub data_quality: DataQualityReport,
 }
 
-/// Data quality report
+/// Data quality report that provides detailed metrics about data quality
+/// 
+/// This structure tracks various quality metrics during data processing,
+/// including missing values, type errors, and validation failures.
+/// It's used to assess the overall quality of the dataset and identify
+/// potential issues that may affect visualization accuracy.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DataQualityReport {
+    /// Total number of rows processed
     pub total_rows: usize,
+    /// Number of rows that passed all validation checks
     pub valid_rows: usize,
+    /// Number of rows that failed validation
     pub invalid_rows: usize,
+    /// Total number of missing/null values across all columns
     pub missing_values: usize,
+    /// Number of type conversion errors encountered
     pub type_errors: usize,
+    /// Number of validation rule violations
     pub validation_errors: usize,
 }
 
 impl DataQualityReport {
+    /// Calculate an overall quality score for the dataset
+    /// 
+    /// This method computes a quality score between 0.0 and 1.0 based on
+    /// two key factors: data validity (ratio of valid rows) and completeness
+    /// (ratio of non-missing values). A score of 1.0 indicates perfect
+    /// data quality, while 0.0 indicates poor quality.
+    /// 
+    /// # Returns
+    /// Quality score between 0.0 and 1.0, or 0.0 if no data was processed
     pub fn quality_score(&self) -> f64 {
         if self.total_rows == 0 {
             return 0.0;
         }
         
+        // Calculate validity ratio (proportion of rows that passed validation)
         let valid_ratio = self.valid_rows as f64 / self.total_rows as f64;
+        
+        // Calculate completeness ratio (proportion of non-missing values)
         let completeness = 1.0 - (self.missing_values as f64 / self.total_rows as f64);
         
+        // Return average of validity and completeness scores
         (valid_ratio + completeness) / 2.0
     }
 }
 
-/// Main data processor
+/// Main data processor that orchestrates the entire data processing pipeline
+/// 
+/// This struct coordinates all the components of the data processing pipeline:
+/// file reading, type inference, validation, optimization, and HTML generation.
+/// It provides a unified interface for processing data files and generating
+/// self-contained HTML visualizations.
 pub struct DataProcessor {
+    /// Configuration settings for the processing pipeline
     config: ProcessingConfig,
+    /// Type inference engine for automatic data type detection
     type_inference: data::inference::TypeInferenceEngine,
+    /// Data validator for quality checking and cleaning
     validator: data::validation::DataValidator,
+    /// Parquet optimizer for efficient data storage
     optimizer: data::optimization::ParquetOptimizer,
+    /// HTML generator for creating interactive visualizations
     html_generator: HtmlGenerator,
 }
 
@@ -71,6 +120,23 @@ impl DataProcessor {
         }
     }
 
+    /// Process a data file and generate an interactive HTML visualization
+    /// 
+    /// This is the main processing function that orchestrates the entire pipeline:
+    /// 1. Detects and reads the input file (CSV or Parquet)
+    /// 2. Performs automatic type inference on all columns
+    /// 3. Validates and cleans the data according to quality rules
+    /// 4. Filters columns if specific columns are requested
+    /// 5. Optimizes the data for browser consumption
+    /// 6. Generates a self-contained HTML file with embedded data
+    /// 
+    /// # Arguments
+    /// * `input_path` - Path to the input CSV or Parquet file
+    /// * `output_path` - Path where the HTML file should be saved
+    /// * `selected_columns` - Optional list of columns to include (empty means all columns)
+    /// 
+    /// # Returns
+    /// ProcessingResult with detailed metrics about the processing operation
     pub async fn process_file(&self, input_path: &std::path::Path, output_path: &std::path::Path, selected_columns: &[String]) -> Result<ProcessingResult, ProcessingError> {
         let start = std::time::Instant::now();
         
