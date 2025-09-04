@@ -1,30 +1,57 @@
 //! HTML generation module
+//! 
+//! This module generates self-contained HTML files with embedded data visualizations.
+//! The generated HTML includes:
+//! - Interactive charts (histograms and category charts) with mouse selection
+//! - Cross-chart filtering system that connects all visualizations
+//! - Embedded data (currently JSON, future: Base64-encoded Parquet)
+//! - Responsive grid layout that adapts to the number of columns
+//! - Chart classes that replicate the functionality of the original data_explorer.html
 
 use crate::data::Schema;
 use serde::{Deserialize, Serialize};
 
+/// Errors that can occur during HTML generation
 #[derive(Debug, thiserror::Error)]
 pub enum HtmlError {
+    /// General HTML generation failure
     #[error("HTML generation error: {0}")]
     GenerationError(String),
     
+    /// Template rendering or structure issues
     #[error("Template error: {0}")]
     TemplateError(String),
     
+    /// Data encoding/embedding problems
     #[error("Data encoding error: {0}")]
     EncodingError(String),
 }
 
+/// Configuration for HTML generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HtmlConfig {
+    /// Title displayed in the browser tab and page header
     pub title: String,
+    /// Visual theme (currently unused but reserved for future theming)
     pub theme: String,
+    /// Chart-specific configuration (bins, colors, interactions)
     pub chart_config: crate::ChartConfig,
+    /// Whether to include hyparquet library for future Parquet support
     pub include_hyparquet: bool,
 }
 
+/// Main HTML generator that creates self-contained visualization files
+/// 
+/// This struct handles the complete pipeline from processed data to interactive HTML:
+/// 1. Embeds data as Base64-encoded JSON (temporary, will be Parquet)
+/// 2. Generates responsive grid layout based on column count
+/// 3. Creates interactive chart classes with mouse selection
+/// 4. Implements cross-chart filtering system
+/// 5. Outputs complete HTML with embedded CSS and JavaScript
 pub struct HtmlGenerator {
+    /// Page title for the generated HTML
     title: String,
+    /// Visual theme (currently unused)
     theme: String,
 }
 
@@ -36,26 +63,49 @@ impl HtmlGenerator {
         }
     }
     
+    /// Generates a complete self-contained HTML file with embedded data and interactive charts
+    /// 
+    /// This is the main entry point that orchestrates the entire HTML generation process:
+    /// 1. Encodes the processed data as Base64 for embedding
+    /// 2. Calculates responsive grid layout based on column count
+    /// 3. Generates HTML structure with loading screen and chart containers
+    /// 4. Embeds JavaScript with interactive chart classes and filtering system
+    /// 5. Returns complete HTML that can be opened in any browser
+    /// 
+    /// # Arguments
+    /// * `parquet_bytes` - The processed data as Parquet bytes (currently unused, will be embedded)
+    /// * `schema` - Schema information about the data columns and their types
+    /// 
+    /// # Returns
+    /// Complete HTML string that can be written to a file and opened in a browser
     pub async fn generate_html(&self, parquet_bytes: &[u8], schema: &Schema) -> Result<String, HtmlError> {
+        // Encode data as Base64 for embedding in HTML
+        // TODO: Replace with actual Parquet embedding using hyparquet library
         let base64_data = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, parquet_bytes);
         
-        // Calculate grid layout based on number of columns
+        // Calculate responsive grid layout based on number of columns
+        // This ensures charts are properly sized and arranged regardless of data size
         let num_columns = schema.columns.len();
         let grid_columns = match num_columns {
-            1 => "1fr",
-            2 => "1fr 1fr", 
-            3 => "1fr 1fr 1fr",
-            4 => "1fr 1fr 1fr 1fr",
-            5..=6 => "repeat(3, 1fr)",
-            _ => "repeat(auto-fit, minmax(300px, 1fr))",
+            1 => "1fr",  // Single column takes full width
+            2 => "1fr 1fr",  // Two equal columns
+            3 => "1fr 1fr 1fr",  // Three equal columns
+            4 => "1fr 1fr 1fr 1fr",  // Four equal columns
+            5..=6 => "repeat(3, 1fr)",  // 3-column grid for 5-6 charts
+            _ => "repeat(auto-fit, minmax(300px, 1fr))",  // Responsive grid for many columns
         };
         
-        // Generate column-specific chart HTML
+        // Generate HTML for each chart container based on column types
+        // Each column gets its own canvas element with appropriate styling
         let mut chart_html = String::new();
         
         for (_i, column) in schema.columns.iter().enumerate() {
             // Create descriptive canvas ID based on column name (like original data_explorer.html)
+            // This ensures valid JavaScript identifiers for chart initialization
             let canvas_id = format!("{}Canvas", column.name.replace(" ", "").replace("_", ""));
+            
+            // Determine panel styling based on data type
+            // This allows for different visual treatments for different data types
             let panel_class = match column.data_type {
                 crate::data::DataType::Float | crate::data::DataType::Integer => "histogram-panel",
                 crate::data::DataType::Categorical(_) => "category-panel",
@@ -133,19 +183,28 @@ impl HtmlGenerator {
         html.push_str("    \n");
         html.push_str("    <div id=\"tooltip\"></div>\n");
         html.push_str("    \n");
+        // Start JavaScript section - this is the core of the interactive functionality
         html.push_str("    <script>\n");
-        html.push_str("        // Embedded data\n");
+        
+        // Embed the processed data as Base64-encoded JSON
+        // This allows the HTML to be completely self-contained
+        html.push_str("        // Embedded data - Base64 encoded for self-contained HTML\n");
         html.push_str(&format!("        const embeddedData = \"{}\";\n", base64_data));
         html.push_str(&format!("        const schema = {};\n", serde_json::to_string(schema).unwrap_or_else(|_| "{}".to_string())));
-        html.push_str("        let allData = null;\n");
-        html.push_str("        let charts = {};\n");
-        html.push_str("        let filters = {};\n");
-        html.push_str("        let filteredIndices = [];\n");
+        
+        // Global state variables for the interactive chart system
+        // These mirror the structure used in the original data_explorer.html
+        html.push_str("        // Global state for interactive charts and filtering\n");
+        html.push_str("        let allData = null;  // Will hold the parsed data from embeddedData\n");
+        html.push_str("        let charts = {};  // Map of column names to chart instances\n");
+        html.push_str("        let filters = {};  // Map of column names to active filters\n");
+        html.push_str("        let filteredIndices = [];  // Array tracking which rows pass all filters\n");
         html.push_str("        \n");
-        html.push_str("        // Initialize data\n");
+        // Data initialization function - decodes embedded data and sets up charts
+        html.push_str("        // Initialize data from embedded Base64 string\n");
         html.push_str("        async function initializeData() {\n");
         html.push_str("            try {\n");
-        html.push_str("                // Decode base64 data\n");
+        html.push_str("                // Decode Base64-encoded data back to binary\n");
         html.push_str("                const binaryString = atob(embeddedData);\n");
         html.push_str("                const bytes = new Uint8Array(binaryString.length);\n");
         html.push_str("                for (let i = 0; i < binaryString.length; i++) {\n");
@@ -153,6 +212,7 @@ impl HtmlGenerator {
         html.push_str("                }\n");
         html.push_str("                \n");
         html.push_str("                // Parse JSON data (temporary - will be replaced with hyparquet)\n");
+        html.push_str("                // TODO: Replace with Parquet parsing using hyparquet library\n");
         html.push_str("                const jsonString = new TextDecoder().decode(bytes);\n");
         html.push_str("                allData = JSON.parse(jsonString);\n");
         html.push_str("                \n");
@@ -173,13 +233,19 @@ impl HtmlGenerator {
         html.push_str("            }\n");
         html.push_str("        }\n");
         html.push_str("        \n");
+        // Base Chart class - provides common functionality for all chart types
+        // This class handles mouse interactions, canvas management, and event binding
+        // It's designed to match the structure and behavior of the original data_explorer.html
         html.push_str("        // Chart base class - matches original data_explorer.html\n");
         html.push_str("        class Chart {\n");
         html.push_str("            constructor(canvasId) {\n");
+        html.push_str("                // Get canvas element and 2D rendering context\n");
         html.push_str("                this.canvas = document.getElementById(canvasId);\n");
         html.push_str("                this.ctx = this.canvas.getContext('2d', { alpha: false });\n");
-        html.push_str("                this.isDragging = false;\n");
-        html.push_str("                this.selection = null;\n");
+        html.push_str("                \n");
+        html.push_str("                // Mouse interaction state\n");
+        html.push_str("                this.isDragging = false;  // Whether user is currently dragging\n");
+        html.push_str("                this.selection = null;  // Current selection rectangle\n");
         html.push_str("                \n");
         html.push_str("                // Bind handlers so we can remove them on destroy\n");
         html.push_str("                this._onResize = this.resize.bind(this);\n");
@@ -215,21 +281,25 @@ impl HtmlGenerator {
         html.push_str("                this.ctx.clearRect(0, 0, this.width, this.height);\n");
         html.push_str("            }\n");
         html.push_str("            \n");
+        html.push_str("            // Handle mouse down - start selection drag\n");
         html.push_str("            onMouseDown(e) {\n");
         html.push_str("                this.isDragging = true;\n");
+        html.push_str("                // Convert screen coordinates to canvas coordinates\n");
         html.push_str("                const rect = this.canvas.getBoundingClientRect();\n");
         html.push_str("                this.startX = e.clientX - rect.left;\n");
         html.push_str("                this.startY = e.clientY - rect.top;\n");
-        html.push_str("                this.selection = null;\n");
+        html.push_str("                this.selection = null;  // Clear previous selection\n");
         html.push_str("            }\n");
         html.push_str("            \n");
+        html.push_str("            // Handle mouse move - update selection rectangle while dragging\n");
         html.push_str("            onMouseMove(e) {\n");
         html.push_str("                if (!this.isDragging) return;\n");
+        html.push_str("                // Convert screen coordinates to canvas coordinates\n");
         html.push_str("                const rect = this.canvas.getBoundingClientRect();\n");
         html.push_str("                this.currentX = e.clientX - rect.left;\n");
         html.push_str("                this.currentY = e.clientY - rect.top;\n");
         html.push_str("                \n");
-        html.push_str("                // Update selection rectangle\n");
+        html.push_str("                // Update selection rectangle (ensure start is top-left, end is bottom-right)\n");
         html.push_str("                this.selection = {\n");
         html.push_str("                    startX: Math.min(this.startX, this.currentX),\n");
         html.push_str("                    startY: Math.min(this.startY, this.currentY),\n");
@@ -237,18 +307,21 @@ impl HtmlGenerator {
         html.push_str("                    endY: Math.max(this.startY, this.currentY)\n");
         html.push_str("                };\n");
         html.push_str("                \n");
+        html.push_str("                // Redraw chart with selection rectangle\n");
         html.push_str("                this.draw();\n");
         html.push_str("            }\n");
         html.push_str("            \n");
+        html.push_str("            // Handle mouse up - complete selection and apply filter\n");
         html.push_str("            onMouseUp(e) {\n");
         html.push_str("                if (!this.isDragging) return;\n");
         html.push_str("                this.isDragging = false;\n");
         html.push_str("                \n");
-        html.push_str("                // Apply selection if it's large enough\n");
+        html.push_str("                // Apply selection if it's large enough (prevents accidental tiny selections)\n");
         html.push_str("                if (this.selection && this.selection.endX - this.selection.startX > 5) {\n");
         html.push_str("                    this.applySelection(this.selection);\n");
         html.push_str("                }\n");
         html.push_str("                \n");
+        html.push_str("                // Clear selection and redraw\n");
         html.push_str("                this.selection = null;\n");
         html.push_str("                this.draw();\n");
         html.push_str("            }\n");
@@ -271,39 +344,46 @@ impl HtmlGenerator {
         html.push_str("            }\n");
         html.push_str("        }\n");
         html.push_str("        \n");
+        // Histogram chart class - handles numeric data visualization with interactive selection
+        // This class creates bar charts for numeric columns and implements range-based filtering
         html.push_str("        // Histogram chart class - matches original\n");
         html.push_str("        class Histogram extends Chart {\n");
         html.push_str("            constructor(canvasId, data, label, formatter) {\n");
         html.push_str("                super(canvasId);\n");
-        html.push_str("                this.data = data;\n");
-        html.push_str("                this.label = label;\n");
-        html.push_str("                this.formatter = formatter || (v => v.toString());\n");
-        html.push_str("                this.margin = { top: 10, right: 10, bottom: 40, left: 50 };\n");
-        html.push_str("                this.isInteracting = false;\n");
-        html.push_str("                this._drawScheduled = false;\n");
+        html.push_str("                this.data = data;  // Array of numeric values to visualize\n");
+        html.push_str("                this.label = label;  // Column name for display\n");
+        html.push_str("                this.formatter = formatter || (v => v.toString());  // Value formatting function\n");
+        html.push_str("                this.margin = { top: 10, right: 10, bottom: 40, left: 50 };  // Chart margins\n");
+        html.push_str("                this.isInteracting = false;  // Whether user is currently interacting\n");
+        html.push_str("                this._drawScheduled = false;  // Prevents multiple simultaneous draws\n");
         html.push_str("            }\n");
         html.push_str("            \n");
         html.push_str("            getFilterKey() {\n");
         html.push_str("                return this.label.toLowerCase();\n");
         html.push_str("            }\n");
         html.push_str("            \n");
+        html.push_str("            // Convert mouse selection rectangle to data range filter\n");
+        html.push_str("            // This is the core of the interactive filtering system\n");
         html.push_str("            applySelection(selection) {\n");
-        html.push_str("                // Convert selection to data range\n");
+        html.push_str("                // Calculate chart drawing area (excluding margins)\n");
         html.push_str("                const width = this.width - this.margin.left - this.margin.right;\n");
         html.push_str("                const height = this.height - this.margin.top - this.margin.bottom;\n");
         html.push_str("                \n");
+        html.push_str("                // Calculate data range and binning parameters\n");
         html.push_str("                const min = Math.min(...this.data);\n");
         html.push_str("                const max = Math.max(...this.data);\n");
         html.push_str("                const binCount = Math.min(20, Math.ceil(Math.sqrt(this.data.length)));\n");
         html.push_str("                const binSize = (max - min) / binCount;\n");
         html.push_str("                \n");
+        html.push_str("                // Convert selection coordinates to bin indices\n");
         html.push_str("                const startBin = Math.floor((selection.startX - this.margin.left) / (width / binCount));\n");
         html.push_str("                const endBin = Math.floor((selection.endX - this.margin.left) / (width / binCount));\n");
         html.push_str("                \n");
+        html.push_str("                // Convert bin indices back to data values\n");
         html.push_str("                const dataMin = min + startBin * binSize;\n");
         html.push_str("                const dataMax = min + (endBin + 1) * binSize;\n");
         html.push_str("                \n");
-        html.push_str("                // Apply filter\n");
+        html.push_str("                // Apply range filter and update all charts\n");
         html.push_str("                filters[this.getFilterKey()] = [dataMin, dataMax];\n");
         html.push_str("                applyFilters();\n");
         html.push_str("            }\n");
@@ -787,33 +867,36 @@ impl HtmlGenerator {
         html.push_str("            });\n");
         html.push_str("        }\n");
         html.push_str("        \n");
+        // Core filtering system - connects all charts together
+        // This function applies all active filters and updates all charts simultaneously
+        // It's the heart of the interactive data exploration experience
         html.push_str("        // Apply filters to all charts\n");
         html.push_str("        function applyFilters() {\n");
-        html.push_str("            // Clear all filtered indices\n");
+        html.push_str("            // Reset filtered indices - start with all rows visible\n");
         html.push_str("            filteredIndices.fill(1);\n");
         html.push_str("            \n");
-        html.push_str("            // Apply each filter\n");
+        html.push_str("            // Apply each active filter sequentially\n");
         html.push_str("            Object.keys(filters).forEach(filterKey => {\n");
         html.push_str("                const filter = filters[filterKey];\n");
         html.push_str("                if (filter) {\n");
         html.push_str("                    if (Array.isArray(filter)) {\n");
-        html.push_str("                        // Range filter\n");
+        html.push_str("                        // Range filter for numeric data (from histogram selections)\n");
         html.push_str("                        const [min, max] = filter;\n");
         html.push_str("                        if (allData && allData.columns && allData.columns[filterKey]) {\n");
         html.push_str("                            const data = allData.columns[filterKey];\n");
         html.push_str("                            data.forEach((value, index) => {\n");
         html.push_str("                                if (value < min || value > max) {\n");
-        html.push_str("                                    filteredIndices[index] = 0;\n");
+        html.push_str("                                    filteredIndices[index] = 0;  // Mark row as filtered out\n");
         html.push_str("                                }\n");
         html.push_str("                            });\n");
         html.push_str("                        }\n");
         html.push_str("                    } else if (filter instanceof Set) {\n");
-        html.push_str("                        // Category filter\n");
+        html.push_str("                        // Category filter for categorical data (from category chart clicks)\n");
         html.push_str("                        if (allData && allData.columns && allData.columns[filterKey]) {\n");
         html.push_str("                            const data = allData.columns[filterKey];\n");
         html.push_str("                            data.forEach((value, index) => {\n");
         html.push_str("                                if (!filter.has(value)) {\n");
-        html.push_str("                                    filteredIndices[index] = 0;\n");
+        html.push_str("                                    filteredIndices[index] = 0;  // Mark row as filtered out\n");
         html.push_str("                                }\n");
         html.push_str("                            });\n");
         html.push_str("                        }\n");
@@ -821,7 +904,7 @@ impl HtmlGenerator {
         html.push_str("                }\n");
         html.push_str("            });\n");
         html.push_str("            \n");
-        html.push_str("            // Redraw all charts\n");
+        html.push_str("            // Redraw all charts to reflect the new filter state\n");
         html.push_str("            Object.values(charts).forEach(chart => {\n");
         html.push_str("                if (chart && chart.draw) {\n");
         html.push_str("                    chart.draw();\n");

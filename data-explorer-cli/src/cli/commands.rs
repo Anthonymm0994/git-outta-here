@@ -1,12 +1,23 @@
 //! Command handling for CLI operations
+//! 
+//! This module contains the CommandHandler struct that orchestrates the execution
+//! of different CLI commands. It acts as the bridge between the CLI interface
+//! and the core data processing functionality.
 
 use crate::{DataProcessor, ProcessingConfig, ProcessingResult};
 use anyhow::Result;
 use std::path::PathBuf;
 use tracing::{info, error, warn};
 
+/// Command handler that executes CLI operations
+/// 
+/// This struct holds the data processor and configuration needed to execute
+/// various CLI commands. It provides a clean interface between the CLI layer
+/// and the core processing functionality.
 pub struct CommandHandler {
+    /// The data processor that handles the actual data processing pipeline
     processor: DataProcessor,
+    /// Configuration settings for data processing
     config: ProcessingConfig,
 }
 
@@ -20,12 +31,25 @@ impl CommandHandler {
         &self.config
     }
 
+    /// Handle the main process command - convert CSV/Parquet to interactive HTML
+    /// 
+    /// This is the core command that processes a data file and generates a
+    /// self-contained HTML file with interactive visualizations. It handles
+    /// the complete pipeline from file reading to HTML generation.
+    /// 
+    /// # Arguments
+    /// * `input` - Path to the input CSV or Parquet file
+    /// * `output` - Path where the HTML file should be saved
+    /// * `columns` - Optional list of columns to include (empty means all columns)
+    /// 
+    /// # Returns
+    /// Result indicating success or failure of the processing operation
     pub async fn handle_process(&self, input: PathBuf, output: PathBuf, columns: Vec<String>) -> Result<()> {
         let start = std::time::Instant::now();
         
         info!("Processing file: {}", input.display());
         
-        // Validate input file exists
+        // Validate input file exists before attempting to process
         if !input.exists() {
             anyhow::bail!("Input file does not exist: {}", input.display());
         }

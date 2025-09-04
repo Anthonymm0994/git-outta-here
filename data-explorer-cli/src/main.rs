@@ -13,17 +13,25 @@ use std::path::PathBuf;
 use tracing::{info, Level};
 use tracing_subscriber;
 
+/// Main entry point for the Data Explorer CLI
+/// 
+/// This function orchestrates the entire CLI application:
+/// 1. Initializes logging and argument parsing
+/// 2. Loads configuration (default or from file)
+/// 3. Creates command handler with the configuration
+/// 4. Executes the requested command
+/// 5. Handles errors and provides user feedback
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
+    // Initialize logging with INFO level by default
     tracing_subscriber::fmt()
         .with_max_level(Level::INFO)
         .init();
 
-    // Parse command line arguments
+    // Parse command line arguments using clap
     let cli = Cli::parse();
 
-    // Set up logging level based on verbose flag
+    // Set up debug logging if verbose flag is provided
     if cli.verbose {
         tracing_subscriber::fmt()
             .with_max_level(Level::DEBUG)
@@ -32,13 +40,13 @@ async fn main() -> Result<()> {
 
     info!("Data Explorer CLI starting...");
 
-    // Load configuration
+    // Load configuration from file or use defaults
     let config = load_config(cli.config.as_ref()).await?;
 
-    // Create command handler
+    // Create command handler with the loaded configuration
     let handler = CommandHandler::new(config);
 
-    // Execute command
+    // Execute the requested command based on CLI arguments
     match cli.command {
         Commands::Process { input, output, columns, config: cmd_config } => {
             let config = if let Some(cmd_config) = cmd_config {
@@ -72,16 +80,30 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+/// Load configuration from file or return default configuration
+/// 
+/// This function handles configuration loading with fallback to defaults.
+/// It reads a JSON configuration file if provided, or uses the built-in
+/// default configuration. This allows users to customize processing behavior
+/// without modifying the source code.
+/// 
+/// # Arguments
+/// * `config_path` - Optional path to configuration file
+/// 
+/// # Returns
+/// ProcessingConfig loaded from file or default configuration
 async fn load_config(config_path: Option<&PathBuf>) -> Result<ProcessingConfig> {
     match config_path {
         Some(path) => {
             info!("Loading configuration from: {}", path.display());
+            // Read configuration file as JSON
             let config_content = std::fs::read_to_string(path)?;
             let config: ProcessingConfig = serde_json::from_str(&config_content)?;
             Ok(config)
         }
         None => {
             info!("Using default configuration");
+            // Use built-in default configuration
             Ok(ProcessingConfig::default())
         }
     }
