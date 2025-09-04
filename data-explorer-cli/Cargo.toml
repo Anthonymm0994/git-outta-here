@@ -1,0 +1,39 @@
+[package]
+name = "data-explorer-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Generate self-contained HTML data visualizations from CSV/Parquet files"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT"
+repository = "https://github.com/yourusername/data-explorer-cli"
+
+[dependencies]
+# CLI and async
+clap = { version = "4.4", features = ["derive"] }
+tokio = { version = "1.0", features = ["full"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging and serialization
+tracing = "0.1"
+tracing-subscriber = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Data processing
+csv = "1.3"
+# parquet = "47.0"  # Temporarily disabled due to compatibility issues
+# arrow = "47.0"    # Temporarily disabled due to compatibility issues
+base64 = "0.21"
+regex = "1.10"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Performance
+rayon = "1.8"
+memmap2 = "0.9"
+
+[dev-dependencies]
+tempfile = "3.8"
+criterion = "0.5"
+cargo-tarpaulin = "0.25"
