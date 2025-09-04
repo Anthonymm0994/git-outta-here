@@ -199,10 +199,15 @@ impl HtmlGenerator {
         html.push_str("                    continue;\n");
         html.push_str("                }\n");
         html.push_str("                \n");
-        html.push_str("                // Get the actual data values\n");
+        html.push_str("                // Get the actual data values from the ColumnData structure\n");
         html.push_str("                let values = [];\n");
-        html.push_str("                if (Array.isArray(columnData) && columnData.length > 1) {\n");
-        html.push_str("                    values = columnData[1];\n");
+        html.push_str("                if (columnData && typeof columnData === 'object') {\n");
+        html.push_str("                    // ColumnData is an object with type as key and data as value\n");
+        html.push_str("                    // e.g., {\"String\": [\"value1\", \"value2\", ...]}\n");
+        html.push_str("                    const dataType = Object.keys(columnData)[0];\n");
+        html.push_str("                    if (dataType && Array.isArray(columnData[dataType])) {\n");
+        html.push_str("                        values = columnData[dataType];\n");
+        html.push_str("                    }\n");
         html.push_str("                }\n");
         html.push_str("                \n");
         html.push_str("                // Create chart based on data type\n");
