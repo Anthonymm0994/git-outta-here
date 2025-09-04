@@ -54,7 +54,8 @@ impl HtmlGenerator {
         let mut chart_html = String::new();
         
         for (i, column) in schema.columns.iter().enumerate() {
-            let chart_id = format!("chart_{}", i);
+            // Create descriptive canvas ID based on column name (like original data_explorer.html)
+            let canvas_id = format!("{}Canvas", column.name.replace(" ", "").replace("_", ""));
             let panel_class = match column.data_type {
                 crate::data::DataType::Float | crate::data::DataType::Integer => "histogram-panel",
                 crate::data::DataType::Categorical(_) => "category-panel",
@@ -63,11 +64,11 @@ impl HtmlGenerator {
             };
             
             chart_html.push_str(&format!(r#"
-        <div class="panel {}" id="{}">
+        <div class="panel {}">
             <div class="panel-title">{}</div>
             <canvas id="{}" width="400" height="300"></canvas>
         </div>"#, 
-                panel_class, chart_id, column.name, chart_id
+                panel_class, column.name, canvas_id
             ));
         }
         
@@ -176,28 +177,25 @@ impl HtmlGenerator {
         html.push_str("                return;\n");
         html.push_str("            }\n");
         html.push_str("            \n");
-        html.push_str("            let chartIndex = 0;\n");
         html.push_str("            \n");
         html.push_str("            for (const [columnName, columnData] of Object.entries(allData.columns)) {\n");
-        html.push_str("                const canvasId = `chart_${chartIndex}`;\n");
+        html.push_str("                // Create canvas ID based on column name (same as HTML generation)\n");
+        html.push_str("                const canvasId = `${columnName.replace(/[ _]/g, '')}Canvas`;\n");
         html.push_str("                const canvas = document.getElementById(canvasId);\n");
         html.push_str("                \n");
         html.push_str("                if (!canvas) {\n");
         html.push_str("                    console.error(`Canvas ${canvasId} not found in DOM`);\n");
-        html.push_str("                    chartIndex++;\n");
         html.push_str("                    continue;\n");
         html.push_str("                }\n");
         html.push_str("                \n");
         html.push_str("                if (typeof canvas.getContext !== 'function') {\n");
         html.push_str("                    console.error(`Canvas ${canvasId} does not have getContext method`);\n");
-        html.push_str("                    chartIndex++;\n");
         html.push_str("                    continue;\n");
         html.push_str("                }\n");
         html.push_str("                \n");
         html.push_str("                const ctx = canvas.getContext('2d');\n");
         html.push_str("                if (!ctx) {\n");
         html.push_str("                    console.error(`Could not get 2D context for canvas ${canvasId}`);\n");
-        html.push_str("                    chartIndex++;\n");
         html.push_str("                    continue;\n");
         html.push_str("                }\n");
         html.push_str("                \n");
@@ -209,7 +207,6 @@ impl HtmlGenerator {
         html.push_str("                \n");
         html.push_str("                // Create chart based on data type\n");
         html.push_str("                createChart(ctx, values, columnName, canvas.width, canvas.height);\n");
-        html.push_str("                chartIndex++;\n");
         html.push_str("            }\n");
         html.push_str("        }\n");
         html.push_str("        \n");
